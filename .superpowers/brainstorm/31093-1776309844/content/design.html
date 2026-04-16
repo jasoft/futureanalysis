@@ -1,0 +1,54 @@
+<h2>设计方案：动态日期与自动导航</h2>
+<p class="subtitle">针对 <code>download_futures_account_status.sh</code> 的优化设计</p>
+
+<div class="section">
+  <h3>1. 动态日期计算 (方案 B)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Shell 逻辑</div>
+    <div class="mockup-body">
+      <pre>
+# 获取当前月份的前一个月 (macOS date 命令)
+DEFAULT_END=$(date -v-1m +%Y-%m)
+
+# 参数处理
+START_MONTH="${1:-2024-09}"
+END_MONTH="${2:-$DEFAULT_END}"
+      </pre>
+      <p class="label">说明</p>
+      <ul>
+        <li>如果用户不提供第二个参数，自动计算为上个月。</li>
+        <li>使用 <code>date -v-1m</code> 兼容 macOS。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. 自动页面导航</h3>
+  <div class="mockup">
+    <div class="mockup-header">JavaScript 注入逻辑</div>
+    <div class="mockup-body">
+      <pre>
+const TARGET_URL = "https://investorservice.cfmmc.com/...";
+if (window.location.href !== TARGET_URL) {
+  window.location.href = TARGET_URL;
+  return "NAVIGATING";
+}
+      </pre>
+      <p class="label">说明</p>
+      <ul>
+        <li>在执行月份选择前，检查当前 URL。</li>
+        <li>如果不匹配，直接跳转并返回状态。</li>
+        <li>Shell 脚本检测到 "NAVIGATING" 状态时，会等待页面加载完成。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. 鲁棒性增强</h3>
+  <ul>
+    <li>增加页面加载检测：在导航后等待特定元素（如 <code>tradeDate</code> 选择框）出现。</li>
+    <li>优化输出文件名：文件名将反映动态计算后的日期范围。</li>
+  </ul>
+</div>

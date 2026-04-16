@@ -1,0 +1,33 @@
+<h2>选择截止日期方案</h2>
+<p class="subtitle">当前脚本使用硬编码日期，我们需要将其改为动态计算（当月的前一个月）</p>
+
+<div class="options">
+  <div class="option" data-choice="auto" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>完全自动计算</h3>
+      <p>脚本启动时自动获取当前月份，并减去 1 个月作为 <code>END_MONTH</code>。无需任何人工干预。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="param" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>参数化 + 默认自动</h3>
+      <p>默认自动计算前一个月，但也允许通过命令行参数手动覆盖日期（例如：<code>./script.sh 2024-01 2024-12</code>）。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>导航逻辑设计</h3>
+  <div class="mockup">
+    <div class="mockup-header">Chrome 逻辑流</div>
+    <div class="mockup-body">
+      <ol>
+        <li>检查当前 URL 是否包含 <code>investorservice.cfmmc.com</code></li>
+        <li>如果不在该页面，使用 JavaScript <code>location.href</code> 强制跳转</li>
+        <li>等待页面加载完成后再执行后续的选择和提交逻辑</li>
+      </ol>
+    </div>
+  </div>
+</div>
