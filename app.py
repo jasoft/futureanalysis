@@ -51,6 +51,12 @@ def find_csv_files(base_dir: Path) -> list[Path]:
 @st.cache_data
 def load_report(csv_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     raw = pd.read_csv(csv_path)
+
+    # Clean up column names and string data
+    raw.columns = [c.strip() for c in raw.columns]
+    # Remove all whitespace from metric names to ensure matching with DEFAULT_METRICS
+    raw["指标"] = raw["指标"].astype(str).str.replace(r"\s+", "", regex=True)
+
     raw["数值"] = raw["值"].map(parse_numeric)
 
     wide = (
@@ -64,7 +70,9 @@ def load_report(csv_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         .sort_values("交易月份")
     )
 
-    for metric in DEFAULT_METRICS:
+    # Ensure all columns exist, removing spaces from metric names here too just in case
+    cleaned_metrics = [m.replace(" ", "").replace("\t", "") for m in DEFAULT_METRICS]
+    for metric in cleaned_metrics:
         if metric not in wide.columns:
             wide[metric] = pd.NA
 
