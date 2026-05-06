@@ -59,6 +59,8 @@ if [[ -z "$OUTFILE" ]]; then
   OUTFILE="$(cd "$(dirname "$0")" && pwd)/futures_account_status_${START_MONTH}_to_${END_MONTH}.csv"
 fi
 
+TARGET_URL="https://investorservice.cfmmc.com/customer/setupViewCustomerMonthDataFromCompanyAuto.do"
+
 chrome_js() {
   local js="$1"
   osascript - "$js" <<'APPLESCRIPT'
@@ -68,6 +70,31 @@ on run argv
   end tell
 end run
 APPLESCRIPT
+}
+
+ensure_page() {
+  local current_url
+  current_url=$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window')
+  
+  if [[ "$current_url" != "$TARGET_URL" ]]; then
+    echo "Redirecting to $TARGET_URL..."
+    osascript -e "tell application \"Google Chrome\" to set URL of active tab of front window to \"$TARGET_URL\""
+    
+    # Wait for page to load and form to appear
+    local attempt
+    for attempt in $(seq 1 10); do
+      sleep 2
+      local status
+      status=$(chrome_js "document.readyState === 'complete' && !!document.forms['customerForm']" || echo "false")
+      if [[ "$status" == "true" ]]; then
+        echo "Page loaded."
+        return 0
+      fi
+      echo "Waiting for page load (attempt $attempt)..."
+    done
+    echo "Failed to load target page" >&2
+    return 1
+  fi
 }
 
 months_between() {
@@ -115,6 +142,8 @@ wait_for_month_data() {
 }
 
 printf '交易月份,指标,值\n' > "$OUTFILE"
+
+ensure_page
 
 while IFS= read -r month; do
   chrome_js "(()=>{const target='${month}'; const s=document.querySelector('select[name=\\\"tradeDate\\\"]'); if(!s) return 'ERR:NO_SELECT'; if(![...s.options].some(o=>o.value===target)){ const opt=document.createElement('option'); opt.value=target; opt.text=target; s.appendChild(opt); } s.value=target; document.forms['customerForm'].submit(); return 'SUBMITTED:'+target;})()" >/dev/null
