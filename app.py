@@ -50,13 +50,25 @@ def find_csv_files(base_dir: Path) -> list[Path]:
 
 
 @st.cache_data
-def load_report(csv_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    raw = pd.read_csv(csv_path)
+def load_all_reports(csv_paths: list[Path]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    all_raw = []
+    # 按文件名排序，确保较新的文件内容在 deduplicate 时排在后面（keep='last'）
+    for path in sorted(csv_paths):
+        df = pd.read_csv(path)
+        all_raw.append(df)
+
+    if not all_raw:
+        return pd.DataFrame(), pd.DataFrame()
+
+    raw = pd.concat(all_raw, ignore_index=True)
 
     # Clean up column names and string data
     raw.columns = [c.strip() for c in raw.columns]
     # Remove all whitespace from metric names to ensure matching with DEFAULT_METRICS
     raw["指标"] = raw["指标"].astype(str).str.replace(r"\s+", "", regex=True)
+
+    # 合并同月份的重复项：对 (交易月份, 指标) 进行去重，保留最后出现的值
+    raw = raw.drop_duplicates(subset=["交易月份", "指标"], keep="last")
 
     raw["数值"] = raw["值"].map(parse_numeric)
 
@@ -294,20 +306,35 @@ def main() -> None:
     st.title("期货账户盈亏分析报表")
     st.caption("基于月度账户资金状况表，分析净入金、交易盈亏、手续费、权益曲线和风险度。")
 
+    raw_df, monthly_df = load_all_reports(csv_files)
+    if monthly_df.empty:
+        st.warning("未能从文件中加载有效数据。")
+        st.stop()
+
     with st.sidebar:
-        selected_file = st.selectbox(
-            "选择数据文件",
-            options=csv_files,
-            format_func=lambda path: path.name,
+        st.subheader("数据管理")
+        st.info(f"已自动合并目录下的 {len(csv_files)} 个数据文件。")
+        
+        # 导出合并后的原始数据
+        csv_data = raw_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="下载合并后的完整数据 (CSV)",
+            data=csv_data,
+            file_name="futures_account_status_merged.csv",
+            mime="text/csv",
         )
 
-    raw_df, monthly_df = load_report(str(selected_file))
     month_options = monthly_df["月标签"].tolist()
-    month_range = st.select_slider(
-        "分析区间",
-        options=month_options,
-        value=(month_options[0], month_options[-1]),
-    )
+
+    if len(month_options) > 1:
+        month_range = st.select_slider(
+            "分析区间",
+            options=month_options,
+            value=(month_options[0], month_options[-1]),
+        )
+    else:
+        month_range = (month_options[0], month_options[0])
+        st.info(f"当前仅有 {month_options[0]} 的数据。")
 
     filtered = monthly_df[
         monthly_df["月标签"].between(month_range[0], month_range[1])
